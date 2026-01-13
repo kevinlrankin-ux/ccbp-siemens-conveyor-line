@@ -1,0 +1,253 @@
+ORGANIZATION_BLOCK "OB1"
+(*
+  OB1 Skeleton (SCL) — CL01 5‑Zone Conveyor Line
+  HMI_POLICY: NO_INST_DB (WinCC reads public Stat DBs only)
+  Diverter/AI: REMOVED
+*)
+VAR_TEMP
+  S01_xFaulted    : Bool;
+  S01_diFaultCode : DInt;
+  S01_aAlm        : Array[1..8] of "Udt_Alarm";
+
+  S02_xFaulted    : Bool;
+  S02_diFaultCode : DInt;
+  S02_aAlm        : Array[1..8] of "Udt_Alarm";
+
+  S03_xFaulted    : Bool;
+  S03_diFaultCode : DInt;
+  S03_aAlm        : Array[1..8] of "Udt_Alarm";
+
+  S04_xFaulted    : Bool;
+  S04_diFaultCode : DInt;
+  S04_aAlm        : Array[1..8] of "Udt_Alarm";
+
+  S05_xFaulted    : Bool;
+  S05_diFaultCode : DInt;
+  S05_aAlm        : Array[1..8] of "Udt_Alarm";
+
+  xStartCond : Bool;
+  xStopCond  : Bool;
+END_VAR
+
+BEGIN
+  // 1) MODE AUTHORITY
+  Inst_ModeAuth(
+    xEStopOK  := xEStopOK,
+    xMaintReq := DB_CL01_HMI.xMaintReq,
+    stIn.xLocalSel := DB_CL01_HMI.xLocalSel,
+    stIn.xRemoteSel := DB_CL01_HMI.xRemoteSel,
+    stIn.xHOA_Hand := DB_CL01_HMI.xHOA_Hand,
+    stIn.xHOA_Off  := DB_CL01_HMI.xHOA_Off,
+    stIn.xHOA_Auto := DB_CL01_HMI.xHOA_Auto,
+    stOut := DB_CL01_Mode.stMode
+  );
+
+  // 2) LINE SEQUENCING (minimal)
+  xStartCond := DB_CL01_HMI.xStartLine AND xEStopOK AND xLinePermExternal;
+  xStopCond  := DB_CL01_HMI.xStopLine OR (NOT xEStopOK) OR (NOT xLinePermExternal);
+
+  DB_CL01_Seq.xStartReq := DB_CL01_HMI.xStartLine;
+  DB_CL01_Seq.xStopReq  := DB_CL01_HMI.xStopLine;
+  DB_CL01_Seq.xResetReq := DB_CL01_HMI.xResetLine;
+
+  DB_CL01_Seq.xReady_S05 := S05_xJamOK;
+  DB_CL01_Seq.xReady_S04 := S04_xJamOK;
+  DB_CL01_Seq.xReady_S03 := S03_xJamOK;
+  DB_CL01_Seq.xReady_S02 := S02_xJamOK;
+  DB_CL01_Seq.xReady_S01 := S01_xJamOK;
+
+  DB_CL01_Seq.xAutoReq_S05 := xStartCond AND (NOT xStopCond);
+  DB_CL01_Seq.xAutoReq_S04 := xStartCond AND DB_CL01_Seq.xReady_S05 AND (NOT xStopCond);
+  DB_CL01_Seq.xAutoReq_S03 := xStartCond AND DB_CL01_Seq.xReady_S04 AND (NOT xStopCond);
+  DB_CL01_Seq.xAutoReq_S02 := xStartCond AND DB_CL01_Seq.xReady_S03 AND (NOT xStopCond);
+  DB_CL01_Seq.xAutoReq_S01 := xStartCond AND DB_CL01_Seq.xReady_S02 AND (NOT xStopCond);
+
+  DB_CL01_Seq.xManReq_S01 := DB_CL01_HMI.xManReq_S01;
+  DB_CL01_Seq.xManReq_S02 := DB_CL01_HMI.xManReq_S02;
+  DB_CL01_Seq.xManReq_S03 := DB_CL01_HMI.xManReq_S03;
+  DB_CL01_Seq.xManReq_S04 := DB_CL01_HMI.xManReq_S04;
+  DB_CL01_Seq.xManReq_S05 := DB_CL01_HMI.xManReq_S05;
+
+  DB_CL01_Seq.xStartBlockedDownstream := xStartCond AND (NOT DB_CL01_Seq.xReady_S05);
+
+  // 3) SECTION CALLS
+  Inst_S01(
+    xEStopOK      := xEStopOK,
+    xPermExternal := xLinePermExternal AND (NOT DB_CL01_HMI.xInhibit_S01),
+    xJamSwitchOK  := S01_xJamOK,
+    xFbRunning    := S01_xFbRunning,
+    xAutoReq      := DB_CL01_Seq.xAutoReq_S01,
+    xManReq       := DB_CL01_Seq.xManReq_S01,
+    xStart        := DB_CL01_HMI.xStartLine,
+    xStop         := DB_CL01_HMI.xStopLine,
+    xReset        := DB_CL01_HMI.xResetLine,
+    iMode         := DB_CL01_Mode.stMode.iMode,
+    xCmdRun       => S01_xCmdRun,
+    xFaulted      => S01_xFaulted,
+    diFaultCode   => S01_diFaultCode,
+    aAlm          => S01_aAlm
+  );
+
+  Inst_S02(
+    xEStopOK      := xEStopOK,
+    xPermExternal := xLinePermExternal AND (NOT DB_CL01_HMI.xInhibit_S02),
+    xJamSwitchOK  := S02_xJamOK,
+    xFbRunning    := S02_xFbRunning,
+    xAutoReq      := DB_CL01_Seq.xAutoReq_S02,
+    xManReq       := DB_CL01_Seq.xManReq_S02,
+    xStart        := DB_CL01_HMI.xStartLine,
+    xStop         := DB_CL01_HMI.xStopLine,
+    xReset        := DB_CL01_HMI.xResetLine,
+    iMode         := DB_CL01_Mode.stMode.iMode,
+    xCmdRun       => S02_xCmdRun,
+    xFaulted      => S02_xFaulted,
+    diFaultCode   => S02_diFaultCode,
+    aAlm          => S02_aAlm
+  );
+
+  Inst_S03(
+    xEStopOK      := xEStopOK,
+    xPermExternal := xLinePermExternal AND (NOT DB_CL01_HMI.xInhibit_S03),
+    xJamSwitchOK  := S03_xJamOK,
+    xFbRunning    := S03_xFbRunning,
+    xAutoReq      := DB_CL01_Seq.xAutoReq_S03,
+    xManReq       := DB_CL01_Seq.xManReq_S03,
+    xStart        := DB_CL01_HMI.xStartLine,
+    xStop         := DB_CL01_HMI.xStopLine,
+    xReset        := DB_CL01_HMI.xResetLine,
+    iMode         := DB_CL01_Mode.stMode.iMode,
+    xCmdRun       => S03_xCmdRun,
+    xFaulted      => S03_xFaulted,
+    diFaultCode   => S03_diFaultCode,
+    aAlm          => S03_aAlm
+  );
+
+  Inst_S04(
+    xEStopOK      := xEStopOK,
+    xPermExternal := xLinePermExternal AND (NOT DB_CL01_HMI.xInhibit_S04),
+    xJamSwitchOK  := S04_xJamOK,
+    xFbRunning    := S04_xFbRunning,
+    xAutoReq      := DB_CL01_Seq.xAutoReq_S04,
+    xManReq       := DB_CL01_Seq.xManReq_S04,
+    xStart        := DB_CL01_HMI.xStartLine,
+    xStop         := DB_CL01_HMI.xStopLine,
+    xReset        := DB_CL01_HMI.xResetLine,
+    iMode         := DB_CL01_Mode.stMode.iMode,
+    xCmdRun       => S04_xCmdRun,
+    xFaulted      => S04_xFaulted,
+    diFaultCode   => S04_diFaultCode,
+    aAlm          => S04_aAlm
+  );
+
+  Inst_S05(
+    xEStopOK      := xEStopOK,
+    xPermExternal := xLinePermExternal AND (NOT DB_CL01_HMI.xInhibit_S05),
+    xJamSwitchOK  := S05_xJamOK,
+    xFbRunning    := S05_xFbRunning,
+    xAutoReq      := DB_CL01_Seq.xAutoReq_S05,
+    xManReq       := DB_CL01_Seq.xManReq_S05,
+    xStart        := DB_CL01_HMI.xStartLine,
+    xStop         := DB_CL01_HMI.xStopLine,
+    xReset        := DB_CL01_HMI.xResetLine,
+    iMode         := DB_CL01_Mode.stMode.iMode,
+    xCmdRun       => S05_xCmdRun,
+    xFaulted      => S05_xFaulted,
+    diFaultCode   => S05_diFaultCode,
+    aAlm          => S05_aAlm
+  );
+
+  // 4) STATUS COPY (NO_INST_DB)
+  DB_CL01_LineStat.iMode            := DB_CL01_Mode.stMode.iMode;
+  DB_CL01_LineStat.xInOff           := DB_CL01_Mode.stMode.xInOff;
+  DB_CL01_LineStat.xInMan           := DB_CL01_Mode.stMode.xInMan;
+  DB_CL01_LineStat.xInAuto          := DB_CL01_Mode.stMode.xInAuto;
+  DB_CL01_LineStat.xInMaint         := DB_CL01_Mode.stMode.xInMaint;
+  DB_CL01_LineStat.xLocalAuthority  := DB_CL01_Mode.stMode.xLocalAuthority;
+  DB_CL01_LineStat.xRemoteAuthority := DB_CL01_Mode.stMode.xRemoteAuthority;
+  DB_CL01_LineStat.xEStopOK         := xEStopOK;
+  DB_CL01_LineStat.xLinePermExternal:= xLinePermExternal;
+
+  DB_CL01_S01_Stat.xCmdRun     := S01_xCmdRun;
+  DB_CL01_S01_Stat.xFaulted    := S01_xFaulted;
+  DB_CL01_S01_Stat.diFaultCode := S01_diFaultCode;
+  DB_CL01_S01_Stat.xJamOK      := S01_xJamOK;
+  DB_CL01_S01_Stat.xFbRunning  := S01_xFbRunning;
+  DB_CL01_S01_Stat.xPE_Entry   := S01_xPE_Entry;
+  DB_CL01_S01_Stat.xPE_Exit    := S01_xPE_Exit;
+  DB_CL01_S01_Stat.xAutoReq    := DB_CL01_Seq.xAutoReq_S01;
+  DB_CL01_S01_Stat.xManReq     := DB_CL01_Seq.xManReq_S01;
+  DB_CL01_S01_Stat.aAlm        := S01_aAlm;
+
+  DB_CL01_S02_Stat.xCmdRun     := S02_xCmdRun;
+  DB_CL01_S02_Stat.xFaulted    := S02_xFaulted;
+  DB_CL01_S02_Stat.diFaultCode := S02_diFaultCode;
+  DB_CL01_S02_Stat.xJamOK      := S02_xJamOK;
+  DB_CL01_S02_Stat.xFbRunning  := S02_xFbRunning;
+  DB_CL01_S02_Stat.xPE_Entry   := S02_xPE_Entry;
+  DB_CL01_S02_Stat.xPE_Exit    := S02_xPE_Exit;
+  DB_CL01_S02_Stat.xAutoReq    := DB_CL01_Seq.xAutoReq_S02;
+  DB_CL01_S02_Stat.xManReq     := DB_CL01_Seq.xManReq_S02;
+  DB_CL01_S02_Stat.aAlm        := S02_aAlm;
+
+  DB_CL01_S03_Stat.xCmdRun     := S03_xCmdRun;
+  DB_CL01_S03_Stat.xFaulted    := S03_xFaulted;
+  DB_CL01_S03_Stat.diFaultCode := S03_diFaultCode;
+  DB_CL01_S03_Stat.xJamOK      := S03_xJamOK;
+  DB_CL01_S03_Stat.xFbRunning  := S03_xFbRunning;
+  DB_CL01_S03_Stat.xPE_Entry   := S03_xPE_Entry;
+  DB_CL01_S03_Stat.xPE_Exit    := S03_xPE_Exit;
+  DB_CL01_S03_Stat.xAutoReq    := DB_CL01_Seq.xAutoReq_S03;
+  DB_CL01_S03_Stat.xManReq     := DB_CL01_Seq.xManReq_S03;
+  DB_CL01_S03_Stat.aAlm        := S03_aAlm;
+
+  DB_CL01_S04_Stat.xCmdRun     := S04_xCmdRun;
+  DB_CL01_S04_Stat.xFaulted    := S04_xFaulted;
+  DB_CL01_S04_Stat.diFaultCode := S04_diFaultCode;
+  DB_CL01_S04_Stat.xJamOK      := S04_xJamOK;
+  DB_CL01_S04_Stat.xFbRunning  := S04_xFbRunning;
+  DB_CL01_S04_Stat.xPE_Entry   := S04_xPE_Entry;
+  DB_CL01_S04_Stat.xPE_Exit    := S04_xPE_Exit;
+  DB_CL01_S04_Stat.xAutoReq    := DB_CL01_Seq.xAutoReq_S04;
+  DB_CL01_S04_Stat.xManReq     := DB_CL01_Seq.xManReq_S04;
+  DB_CL01_S04_Stat.aAlm        := S04_aAlm;
+
+  DB_CL01_S05_Stat.xCmdRun     := S05_xCmdRun;
+  DB_CL01_S05_Stat.xFaulted    := S05_xFaulted;
+  DB_CL01_S05_Stat.diFaultCode := S05_diFaultCode;
+  DB_CL01_S05_Stat.xJamOK      := S05_xJamOK;
+  DB_CL01_S05_Stat.xFbRunning  := S05_xFbRunning;
+  DB_CL01_S05_Stat.xPE_Entry   := S05_xPE_Entry;
+  DB_CL01_S05_Stat.xPE_Exit    := S05_xPE_Exit;
+  DB_CL01_S05_Stat.xAutoReq    := DB_CL01_Seq.xAutoReq_S05;
+  DB_CL01_S05_Stat.xManReq     := DB_CL01_Seq.xManReq_S05;
+  DB_CL01_S05_Stat.aAlm        := S05_aAlm;
+
+  // 5) ALARM BANNER (downstream-first)
+  AlmR_S05(xResetSummary := DB_CL01_HMI.xResetLine, aIn := DB_CL01_S05_Stat.aAlm);
+  AlmR_S04(xResetSummary := DB_CL01_HMI.xResetLine, aIn := DB_CL01_S04_Stat.aAlm);
+  AlmR_S03(xResetSummary := DB_CL01_HMI.xResetLine, aIn := DB_CL01_S03_Stat.aAlm);
+  AlmR_S02(xResetSummary := DB_CL01_HMI.xResetLine, aIn := DB_CL01_S02_Stat.aAlm);
+  AlmR_S01(xResetSummary := DB_CL01_HMI.xResetLine, aIn := DB_CL01_S01_Stat.aAlm);
+
+  DB_CL01_LineStat.xAnyActive :=
+    AlmR_S05.xAnyActive OR AlmR_S04.xAnyActive OR AlmR_S03.xAnyActive OR AlmR_S02.xAnyActive OR AlmR_S01.xAnyActive;
+
+  DB_CL01_LineStat.diFirstOutCode := 0;
+  IF AlmR_S05.diFirstOutCode <> 0 THEN
+    DB_CL01_LineStat.diFirstOutCode := AlmR_S05.diFirstOutCode;
+  ELSIF AlmR_S04.diFirstOutCode <> 0 THEN
+    DB_CL01_LineStat.diFirstOutCode := AlmR_S04.diFirstOutCode;
+  ELSIF AlmR_S03.diFirstOutCode <> 0 THEN
+    DB_CL01_LineStat.diFirstOutCode := AlmR_S03.diFirstOutCode;
+  ELSIF AlmR_S02.diFirstOutCode <> 0 THEN
+    DB_CL01_LineStat.diFirstOutCode := AlmR_S02.diFirstOutCode;
+  ELSIF AlmR_S01.diFirstOutCode <> 0 THEN
+    DB_CL01_LineStat.diFirstOutCode := AlmR_S01.diFirstOutCode;
+  END_IF;
+
+  DB_CL01_LineStat.iTopPriority :=
+    MIN(AlmR_S05.iTopPriority,
+    MIN(AlmR_S04.iTopPriority,
+    MIN(AlmR_S03.iTopPriority,
+    MIN(AlmR_S02.iTopPriority, AlmR_S01.iTopPriority))));
+END_ORGANIZATION_BLOCK
