@@ -26,7 +26,6 @@ jobs:
 
           $repoRoot = (Get-Location).Path
 
-          # Locate validate entrypoint (supports both layouts)
           $candidates = @(
             Join-Path $repoRoot "tools\ccbp\Invoke-CCBP.ps1",
             Join-Path $repoRoot "tools\Invoke-CCBP.ps1"
